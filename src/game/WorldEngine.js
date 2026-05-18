@@ -98,6 +98,10 @@ export class WorldEngine {
         } else if (self._nearDoor) {
           if (self._nearDoor.type === 'bonus') {
             self._handleBonus();
+          } else if (self._nearDoor.type === 'scoreboard') {
+            if (self.opts.onOpenScoreboard) self.opts.onOpenScoreboard();
+          } else if (self._nearDoor.type === 'ending') {
+            if (self.opts.onGoToEnding) self.opts.onGoToEnding();
           } else if (self.opts.onGoToMap) {
             self.opts.onGoToMap();
           }
@@ -228,17 +232,18 @@ export class WorldEngine {
         var dy = p.y - n.y;
         var ch = CHALLENGE_NODES[i];
         var unlocked = i === 0 || completed.includes(CHALLENGE_NODES[i - 1].id);
-        if (Math.sqrt(dx * dx + dy * dy) < 56 && unlocked && !completed.includes(ch.id)) {
+        if (Math.sqrt(dx * dx + dy * dy) < 56 && unlocked) {
           this.nearNode = i;
           break;
         }
       }
       if (this.nearNode >= 0) {
         var n2 = getNodePositions(this.W, this.H)[this.nearNode];
+        var isDone = completed.includes(CHALLENGE_NODES[this.nearNode].id);
         this.prompt.style.display = 'block';
         this.prompt.style.left = n2.x + 'px';
         this.prompt.style.top = (n2.y - 50) + 'px';
-        this.prompt.textContent = '[E] Entrar: ' + CHALLENGE_NODES[this.nearNode].label;
+        this.prompt.textContent = isDone ? '[E] Rejogar: ' + CHALLENGE_NODES[this.nearNode].label : '[E] Entrar: ' + CHALLENGE_NODES[this.nearNode].label;
       }
     }
   }
@@ -295,24 +300,164 @@ export class WorldEngine {
   _drawMap(ctx, W, H) {
     var nodes = getNodePositions(W, H);
     var completed = (this.opts.progress && this.opts.progress.completed) ? this.opts.progress.completed : [];
-    ctx.fillStyle = 'rgba(0,229,255,.03)'; ctx.strokeStyle = 'rgba(0,229,255,.08)'; ctx.lineWidth = 2;
-    for (var i = 0; i < nodes.length; i++) { var n = nodes[i]; ctx.beginPath(); ctx.ellipse(n.x, n.y, 28, 24, 0, 0, Math.PI*2); ctx.fill(); ctx.stroke(); }
-    ctx.lineWidth = 1.5; ctx.strokeStyle = 'rgba(0,229,255,.12)';
-    for (var i = 0; i < nodes.length-1; i++) { ctx.beginPath(); ctx.moveTo(nodes[i].x, nodes[i].y); ctx.lineTo(nodes[i+1].x, nodes[i+1].y); ctx.stroke(); }
-    ctx.fillStyle = 'rgba(0,0,0,.05)';
-    for (var i = 0; i < nodes.length; i++) { var unlocked = i===0||completed.includes(CHALLENGE_NODES[i-1].id); if(!unlocked){ctx.beginPath();ctx.ellipse(nodes[i].x,nodes[i].y,28,24,0,0,Math.PI*2);ctx.fill();} }
-    ctx.font = '20px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    for (var i = 0; i < nodes.length; i++) { var ch = CHALLENGE_NODES[i]; var unlocked = i===0||completed.includes(CHALLENGE_NODES[i-1].id); var done = completed.includes(ch.id); ctx.globalAlpha = unlocked?1:0.3; ctx.fillText(done?'\u2705':ch.icon, nodes[i].x, nodes[i].y); }
-    ctx.globalAlpha = 1;
+    var t = this.time;
+
+    // Draw animated connection lines
+    for (var i = 0; i < nodes.length - 1; i++) {
+      var from = nodes[i], to = nodes[i+1];
+      var done = completed.includes(CHALLENGE_NODES[i].id);
+      var grad = ctx.createLinearGradient(from.x, from.y, to.x, to.y);
+      if (done) {
+        grad.addColorStop(0, 'rgba(40,200,64,.6)');
+        grad.addColorStop(1, 'rgba(40,200,64,.2)');
+      } else {
+        grad.addColorStop(0, 'rgba(0,229,255,.25)');
+        grad.addColorStop(1, 'rgba(0,229,255,.05)');
+      }
+      ctx.strokeStyle = grad; ctx.lineWidth = 2.5;
+      ctx.setLineDash([8, 6]);
+      ctx.lineDashOffset = -t * 0.5;
+      ctx.beginPath(); ctx.moveTo(from.x, from.y); ctx.lineTo(to.x, to.y); ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    // Draw nodes
+    for (var i = 0; i < nodes.length; i++) {
+      var n = nodes[i];
+      var ch = CHALLENGE_NODES[i];
+      var unlocked = i === 0 || completed.includes(CHALLENGE_NODES[i - 1].id);
+      var done = completed.includes(ch.id);
+      var pulse = Math.sin(t * 0.06 + i * 1.2) * 4;
+
+      // Outer glow ring
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 34 + (unlocked ? pulse : 0), 0, Math.PI * 2);
+      if (done) {
+        ctx.fillStyle = 'rgba(40,200,64,.08)';
+        ctx.strokeStyle = 'rgba(40,200,64,.3)';
+      } else if (unlocked) {
+        ctx.fillStyle = 'rgba(0,229,255,.06)';
+        ctx.strokeStyle = 'rgba(0,229,255,.4)';
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,.02)';
+        ctx.strokeStyle = 'rgba(255,255,255,.08)';
+      }
+      ctx.lineWidth = 2; ctx.fill(); ctx.stroke();
+
+      // Inner circle
+      ctx.beginPath();
+      ctx.arc(n.x, n.y, 22, 0, Math.PI * 2);
+      if (done) {
+        ctx.fillStyle = 'rgba(40,200,64,.15)';
+      } else if (unlocked) {
+        ctx.fillStyle = 'rgba(0,229,255,.12)';
+      } else {
+        ctx.fillStyle = 'rgba(30,30,50,.5)';
+      }
+      ctx.fill();
+
+      // Particles for completed nodes
+      if (done) {
+        for (var p2 = 0; p2 < 3; p2++) {
+          var angle = (t * 0.02 + p2 * 2.09) + i;
+          var px = n.x + Math.cos(angle) * (28 + pulse);
+          var py = n.y + Math.sin(angle) * (28 + pulse);
+          ctx.beginPath(); ctx.arc(px, py, 2, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(40,200,64,' + (0.4 + Math.sin(t * 0.1 + p2) * 0.3) + ')';
+          ctx.fill();
+        }
+      }
+
+      // Pulsing ring for unlocked (not done)
+      if (unlocked && !done) {
+        var ringPulse = (Math.sin(t * 0.04 + i) + 1) * 0.5;
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, 26 + ringPulse * 10, 0, Math.PI * 2);
+        ctx.strokeStyle = 'rgba(0,229,255,' + (0.15 - ringPulse * 0.12) + ')';
+        ctx.lineWidth = 1.5; ctx.stroke();
+      }
+
+      // Icon
+      ctx.globalAlpha = unlocked ? 1 : 0.3;
+      ctx.font = '22px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.fillText(done ? '🏆' : ch.icon, n.x, n.y);
+      ctx.globalAlpha = 1;
+
+      // Label
+      ctx.font = "bold 11px 'Orbitron', sans-serif"; ctx.textAlign = 'center';
+      if (done) {
+        ctx.fillStyle = 'rgba(40,200,64,.8)';
+      } else if (unlocked) {
+        ctx.fillStyle = 'rgba(0,229,255,.8)';
+      } else {
+        ctx.fillStyle = 'rgba(255,255,255,.25)';
+      }
+      ctx.fillText(ch.label, n.x, n.y + 38);
+
+      // Difficulty stars
+      if (unlocked) {
+        ctx.font = '9px sans-serif';
+        ctx.fillText('⭐'.repeat(ch.difficulty), n.x, n.y + 50);
+      }
+    }
+
+    // Door back to lobby
+    this._drawDoor(ctx, 60, H / 2, 'LOBBY', 'map');
+
+    // Door to ending (only if all 5 challenges completed)
+    if (completed.length >= 5) {
+      this._drawDoor(ctx, W - 60, H / 2, 'FINAL', 'ending');
+    }
   }
 
   _drawEnding(ctx, W, H) {
-    ctx.fillStyle = '#000'; ctx.fillRect(0, 0, W, H);
-    ctx.fillStyle = '#fff'; ctx.font = 'bold 24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText('PARABENS!', W/2, H/2-30);
-    ctx.font = '16px sans-serif';
-    ctx.fillText('Voce completou todos os desafios!', W/2, H/2+10);
-    ctx.fillText('Aperte R para reiniciar ou F5 para recarregar.', W/2, H/2+40);
+    // Draw bonus portal on the floor (bottom-right corner)
+    var bx = W - 120, by = H - 100;
+    var pulse = Math.sin(this.time * 0.05) * 5;
+    var p = this.player;
+    var dx = p.x - bx, dy = p.y - by;
+    var dist = Math.sqrt(dx*dx + dy*dy);
+    var isNear = dist < 60;
+
+    // Portal glow
+    ctx.beginPath(); ctx.arc(bx, by, 32 + pulse, 0, Math.PI*2);
+    ctx.fillStyle = isNear ? 'rgba(255,209,102,.2)' : 'rgba(255,209,102,.08)'; ctx.fill();
+    ctx.strokeStyle = isNear ? '#ffd166' : 'rgba(255,209,102,.4)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.font = '24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffd166'; ctx.fillText('💠', bx, by);
+    ctx.font = "bold 10px 'Orbitron', sans-serif";
+    ctx.fillStyle = 'rgba(255,209,102,.7)'; ctx.fillText('BONUS', bx, by + 42);
+
+    if (isNear) {
+      this._nearDoor = { type: 'bonus' };
+      this.prompt.style.display = 'block';
+      this.prompt.style.left = bx + 'px';
+      this.prompt.style.top = (by - 50) + 'px';
+      this.prompt.textContent = '[E] Desafio Extra';
+    }
+
+    // Draw scoreboard item (bottom-left corner)
+    var sx = 120, sy = H - 100;
+    var pulse2 = Math.sin(this.time * 0.04 + 1) * 4;
+    var dx2 = p.x - sx, dy2 = p.y - sy;
+    var dist2 = Math.sqrt(dx2*dx2 + dy2*dy2);
+    var isNear2 = dist2 < 60;
+
+    ctx.beginPath(); ctx.arc(sx, sy, 30 + pulse2, 0, Math.PI*2);
+    ctx.fillStyle = isNear2 ? 'rgba(0,229,255,.2)' : 'rgba(0,229,255,.06)'; ctx.fill();
+    ctx.strokeStyle = isNear2 ? '#00e5ff' : 'rgba(0,229,255,.35)'; ctx.lineWidth = 2; ctx.stroke();
+    ctx.font = '24px sans-serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#00e5ff'; ctx.fillText('🏅', sx, sy);
+    ctx.font = "bold 10px 'Orbitron', sans-serif";
+    ctx.fillStyle = 'rgba(0,229,255,.7)'; ctx.fillText('PLACAR', sx, sy + 42);
+
+    if (isNear2 && !isNear) {
+      this._nearDoor = { type: 'scoreboard' };
+      this.prompt.style.display = 'block';
+      this.prompt.style.left = sx + 'px';
+      this.prompt.style.top = (sy - 50) + 'px';
+      this.prompt.textContent = '[E] Placar';
+    }
   }
 
   _interactWithNode(idx) {

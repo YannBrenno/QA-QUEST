@@ -4,7 +4,7 @@ import { WorldEngine }   from '../game/WorldEngine.js';
 import { presence }      from '../multiplayer/presence.js';
 import { showModal }     from '../components/Modal.js';
 
-export function WorldScreen({ player, area, progress, onEnterChallenge, onGoToMap, onOpenBonus }) {
+export function WorldScreen({ player, area, progress, onEnterChallenge, onGoToMap, onOpenBonus, onOpenScoreboard, onGoToEnding }) {
   const el = document.createElement('div');
   el.id = 'screen-world';
   el.style.cssText = 'width:100%;height:100%;position:relative;overflow:hidden;';
@@ -33,13 +33,13 @@ export function WorldScreen({ player, area, progress, onEnterChallenge, onGoToMa
       progress,
       onEnterChallenge(node) {
         const isDone = (progress.completed ?? []).includes(node.id);
-        if (isDone) return;
 
         // Show challenge info modal
         const stars = '⭐'.repeat(node.difficulty);
+        const desc = isDone ? '<p>Desafio já concluído! Deseja jogar novamente?</p>' : '<p>Encontre 5 bugs nesta página e avance para o próximo desafio.</p>';
         showModal({
           title: `${node.icon} ${node.label}`,
-          body: `<p>Encontre 5 bugs nesta página e avance para o próximo desafio.</p><br><p style="color:var(--color-gold)">${stars}</p>`,
+          body: `${desc}<br><p style="color:var(--color-gold)">${stars}</p>`,
           buttons: [
             {
               label: '▶ Entrar',
@@ -54,10 +54,15 @@ export function WorldScreen({ player, area, progress, onEnterChallenge, onGoToMa
         });
       },
       onOpenBonus: () => {
-        // open bonus externally
         if (onOpenBonus) onOpenBonus();
       },
-      // onGoToMap: garante que o engine pare antes de mudar de tela
+      onOpenScoreboard: () => {
+        if (onOpenScoreboard) onOpenScoreboard();
+      },
+      onGoToEnding: () => {
+        engine?.stop();
+        if (onGoToEnding) onGoToEnding();
+      },
       onGoToMap: () => {
         engine?.stop();
         if (onGoToMap) onGoToMap();

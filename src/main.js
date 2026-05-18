@@ -82,6 +82,7 @@ function showMap() {
     progress,
     onEnterChallenge: showChallenge,
     onGoToMap: () => showLobby(),
+    onGoToEnding: () => showEnding(),
   }));
 }
 
@@ -106,7 +107,7 @@ function showChallenge(node) {
 function showEnding() {
   progress = storage.loadProgress();
   try { presence.changeArea('ending'); } catch {}
-  goto(EndingScreen({ player: playerData, progress }));
+  goto(EndingScreen({ player: playerData, progress, onGoToMap: showMap }));
 }
 
 // ---- Boot ----
