@@ -13,7 +13,7 @@ export function CreditsScreen({ onBack }) {
         Um jogo educativo sobre Quality Assurance.<br>
         Aprenda a identificar bugs reais enquanto se diverte.<br><br>
         <strong style="color:var(--color-text)">Conceito & Design</strong><br>
-        <span style="color:var(--color-muted)">Feito com ❤️ por QA lovers</span><br><br>
+        <span style="color:var(--color-muted)">Criado e idealizado por Yann Ramos</span><br><br>
         <strong style="color:var(--color-text)">Tecnologias</strong><br>
         <span style="color:var(--color-muted)">HTML · CSS · JavaScript · Vite · Supabase</span><br><br>
         <strong style="color:var(--color-text)">Multiplicador</strong><br>
