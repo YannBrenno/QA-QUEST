@@ -70,8 +70,8 @@ export function BonusChallengeScreen({ player, onExit }) {
   const traps = [
     { label: '🔍 Inspecionar Elemento', icon: '' },
     { label: '📁 /admin/secret.txt', icon: '' },
-    { label: '🗝️ Chave Mestra', icon: '' },
-    { label: '💾 dump_database()', icon: '' },
+    { label: '🗝️ Chave Mestra Base', icon: '' },
+    { label: '💾 dump_database(64)', icon: '' },
     { label: '🐛 bug_report.log', icon: '' },
   ];
   traps.forEach(trap => {
